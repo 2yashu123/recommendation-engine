@@ -1,4 +1,5 @@
-﻿# AI Recommendation Engine
+**Status:** Phase 1 (Day 1). Development environment initialized, backend and frontend scaffolded.
+# AI Recommendation Engine
 
 An end-to-end AI-powered Recommendation Engine designed to deliver personalized content and product recommendations in real time. The platform integrates a modern Next.js frontend with a high-performance Python FastAPI backend, leveraging PostgreSQL with pgvector for efficient vector similarity searches, Redis for low-latency caching, and machine learning pipelines built using pandas and scikit-learn.
 
@@ -12,6 +13,7 @@ An end-to-end AI-powered Recommendation Engine designed to deliver personalized 
 - **Containerization**: Docker & Docker Compose
 
 ## Project Structure
+**Status:** Phase 1 (Day 1). Development environment initialized, backend and frontend scaffolded.
 
 ```text
 recommendation-engine/
@@ -43,6 +45,7 @@ Copy the template environment file and set your credentials:
 ```bash
 cp .env.example .env
 ```
+Open .env and replace the placeholder with your own DB_PASSWORD.
 
 ### 2. Backend Setup
 Navigate to the `backend/` directory, activate the virtual environment, install dependencies, and start the development server:
