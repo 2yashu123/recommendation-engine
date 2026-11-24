@@ -1,34 +1,8 @@
-﻿# Environment & secrets
+﻿node_modules/
 .env
-.env*.local
-*.env
-!.env.example
-
-# Python virtual environment & bytecode
-venv/
-env/
-ENV/
+.env.local
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# Node & Next.js build outputs
-node_modules/
+venv/
+.venv/
 .next/
-out/
-build/
-dist/
-
-# Raw dataset files
-data/raw/
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# OS & IDE metadata
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
+*.log
