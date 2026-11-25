@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 .env
 .env.local
 __pycache__/
@@ -6,3 +6,4 @@ venv/
 .venv/
 .next/
 *.log
+*.pdf

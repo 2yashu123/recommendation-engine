@@ -3,14 +3,22 @@
 
 An end-to-end AI-powered Recommendation Engine designed to deliver personalized content and product recommendations in real time. The platform integrates a modern Next.js frontend with a high-performance Python FastAPI backend, leveraging PostgreSQL with pgvector for efficient vector similarity searches, Redis for low-latency caching, and machine learning pipelines built using pandas and scikit-learn.
 
+## Project Overview
+
+The AI Recommendation Engine addresses the cold-start and real-time retrieval challenges in modern web platforms. By combining dense vector similarity searches (semantic embeddings via pgvector) with collaborative/content-based filtering and high-speed in-memory caching via Redis, the engine delivers hyper-personalized recommendations at scale with sub-50ms latency.
+
+---
+
 ## Tech Stack
 
 - **Frontend**: Next.js 16 (React 19, TypeScript, Tailwind CSS, App Router)
 - **Backend**: FastAPI (Python 3.12, Uvicorn)
-- **Machine Learning & Data**: pandas, scikit-learn, Jupyter
+- **Machine Learning & Data**: pandas, scikit-learn, Jupyter, sentence-transformers
 - **Vector Database**: PostgreSQL 16 with pgvector extension (`pgvector/pgvector:pg16`)
 - **In-Memory Cache**: Redis (`redis:7`)
 - **Containerization**: Docker & Docker Compose
+
+---
 
 ## Project Structure
 **Status:** Phase 1 (Day 1). Development environment initialized, backend and frontend scaffolded.
@@ -19,16 +27,25 @@ An end-to-end AI-powered Recommendation Engine designed to deliver personalized 
 recommendation-engine/
 ├── backend/
 │   ├── app/                 # FastAPI application modules
+│   │   ├── api/             # API route endpoints and routers
+│   │   ├── core/            # Configuration and application settings
+│   │   ├── models/          # Pydantic schemas and database models
+│   │   └── services/        # Recommendation engine & vector logic
+│   ├── tests/               # Backend unit and integration tests
 │   ├── venv/                # Python virtual environment (ignored in git)
 │   ├── main.py              # Application entry point & routes
 │   └── requirements.txt     # Python backend dependencies
 ├── frontend/
 │   ├── src/                 # Next.js source code (App Router)
+│   │   ├── app/             # Application routes and pages
+│   │   ├── components/      # Reusable UI components
+│   │   └── lib/             # API client utilities and helper functions
 │   ├── public/              # Static assets
 │   ├── package.json         # Node.js dependencies and scripts
 │   └── tsconfig.json        # TypeScript configuration
-├── data/                    # Dataset storage (raw and processed data)
-│   └── raw/                 # Raw dataset files (ignored in git)
+├── data/                    # Dataset storage
+│   ├── raw/                 # Raw dataset files (ignored in git)
+│   └── processed/           # Cleaned datasets and vector caches
 ├── notebooks/               # Jupyter notebooks for data analysis & modeling
 ├── db/                      # Database migration scripts & schemas
 ├── docs/                    # Architecture diagrams & project documentation
@@ -37,6 +54,55 @@ recommendation-engine/
 ├── .gitignore               # Root git ignore specification
 └── README.md                # Project documentation
 ```
+
+For full directory documentation, see [`docs/folder-structure.md`](docs/folder-structure.md).
+
+---
+
+## System Modules
+
+The platform is designed around 7 decoupled modules (detailed in [`docs/modules.md`](docs/modules.md)):
+1. **Frontend UI**: Responsive Next.js application delivering catalog browsing, feed rendering, and click event streaming.
+2. **Backend API**: FastAPI gateway managing request validation, security, and cache orchestration.
+3. **Recommendation Engine**: Computes similarity scores, candidate ranking, and business rule filtering.
+4. **Data Pipeline**: Ingests, cleans, normalizes raw datasets and generates dense vector embeddings.
+5. **Database (PostgreSQL + pgvector)**: Persistent datastore for relational entities and high-dimensional vector search.
+6. **Cache (Redis)**: Low-latency key-value store caching frequent recommendation feeds with TTL invalidation.
+7. **Evaluation Module**: Offline benchmarking suite computing Precision@K, Recall@K, and ranking quality.
+
+---
+
+## Architecture & Data Flow
+
+The system features two interconnected data loops: a real-time online inference pipeline optimized for low latency, and an offline pipeline for ETL and evaluation.
+
+![AI Recommendation Engine Architecture](docs/architecture.png)
+
+Detailed architectural specifications and flow descriptions are available in [`docs/architecture.md`](docs/architecture.md).
+
+---
+
+## Development Plan
+
+- **Phase 1: Environment & Architecture (Current)**
+  - Scaffold project workspace, install dependencies, and configure Git repository.
+  - Define system modularity, folder structure, and architecture specifications.
+- **Phase 2: Data Pipeline & Vector Database**
+  - Ingest raw dataset into `data/raw/` and clean features with `pandas`.
+  - Provision PostgreSQL with `pgvector` extension and define schema migrations.
+  - Generate embeddings using `sentence-transformers` and build HNSW vector index.
+- **Phase 3: Recommendation Engine & Redis Caching**
+  - Implement similarity scoring and candidate retrieval in `backend/app/services/`.
+  - Integrate Redis caching layer (`hit` returns in <5ms; `miss` computes and warms cache).
+  - Expose REST API endpoints under `backend/app/api/`.
+- **Phase 4: Next.js Frontend UI**
+  - Build recommendation feeds, product cards, and search filters in `frontend/src/components/`.
+  - Connect Next.js App Router to FastAPI backend endpoints.
+- **Phase 5: Evaluation, Benchmarking & Deployment**
+  - Benchmark model accuracy (Precision@K, Recall@K) in Jupyter notebooks.
+  - Containerize services with Docker Compose for end-to-end production testing.
+
+---
 
 ## Getting Started
 
