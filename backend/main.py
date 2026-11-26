@@ -1,59 +1,71 @@
 """
 main.py - FastAPI application entry point for the AI Recommendation Engine.
 
-This is the central file that creates the FastAPI app, configures CORS,
-and includes all API routes. Run with:
-    uvicorn main:app --reload --host 127.0.0.1 --port 8000
+Day 6 updates:
+- Extracted business logic to app/services/catalog_service.py
+- Replaced deprecated @app.on_event("startup") with FastAPI lifespan
+- Added GET /recommendations/popular (weighted rating fallback)
+- Added POST /ratings (temporary CSV/in-memory rating storage with Pydantic validation)
 """
 
-from fastapi import FastAPI, HTTPException, Query
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-import pandas as pd
-import os
+from pydantic import BaseModel, Field
+from app.services.catalog_service import CatalogService
 
-# ---------------------------------------------------------------------------
-# App setup
-# ---------------------------------------------------------------------------
+# Global service instance initialized during app startup
+catalog_service: CatalogService | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load processed movie data when the server starts."""
+    global catalog_service
+    catalog_service = CatalogService()
+    print(f"Loaded {len(catalog_service.movies_df)} movies into CatalogService")
+    yield
+
+
 app = FastAPI(
     title="AI Recommendation Engine",
-    description="Backend API for movie recommendations using content-based filtering.",
-    version="0.1.0",
+    description="Backend API for movie catalog, popular recommendations, and user ratings.",
+    version="0.2.0",
+    lifespan=lifespan,
 )
 
-# Allow the Next.js frontend (localhost:3000) to call this API
+# Allow Next.js frontend to call this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # ---------------------------------------------------------------------------
-# Load processed data into memory on startup
+# Pydantic Schemas
 # ---------------------------------------------------------------------------
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "movies_clean.csv")
+class RatingCreate(BaseModel):
+    user_id: int = Field(default=1, ge=1, description="ID of the user submitting the rating")
+    movie_id: int = Field(..., ge=1, description="ID of the movie being rated")
+    rating: float = Field(..., ge=1.0, le=5.0, description="Rating score between 1 and 5")
 
-# Global dataframe - loaded once when the server starts
-movies_df: pd.DataFrame = pd.DataFrame()
 
-
-@app.on_event("startup")
-def load_data():
-    """Load the cleaned movie dataset when the server starts."""
-    global movies_df
-    try:
-        movies_df = pd.read_csv(DATA_PATH)
-        print(f"Loaded {len(movies_df)} movies from {DATA_PATH}")
-    except FileNotFoundError:
-        print(f"WARNING: {DATA_PATH} not found. Run the data pipeline first.")
-        print("  cd backend && python -m app.services.data_loader")
+def _get_service() -> CatalogService:
+    """Helper to ensure data is loaded before serving requests."""
+    if catalog_service is None or catalog_service.movies_df.empty:
+        raise HTTPException(
+            status_code=503,
+            detail="Dataset not loaded. Run python -m app.services.data_loader first.",
+        )
+    return catalog_service
 
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
-
 @app.get("/")
 def read_root():
     """Health check - returns API status."""
@@ -62,71 +74,56 @@ def read_root():
 
 @app.get("/items")
 def get_items(
-    limit: int = Query(default=20, ge=1, le=100, description="Number of items to return"),
+    limit: int = Query(default=20, ge=1, le=100, description="Items per page (1-100)"),
     offset: int = Query(default=0, ge=0, description="Number of items to skip"),
 ):
-    """
-    GET /items - Returns a paginated list of movies.
-
-    Query parameters:
-    - limit: how many items to return (1-100, default 20)
-    - offset: how many items to skip (default 0)
-
-    Returns a JSON object with total count and the list of items.
-    """
-    if movies_df.empty:
-        raise HTTPException(status_code=503, detail="Data not loaded. Run the data pipeline first.")
-
-    total = len(movies_df)
-    # Slice the dataframe for pagination
-    page = movies_df.iloc[offset : offset + limit]
-
-    # Convert to list of dicts for JSON response
-    items = []
-    for _, row in page.iterrows():
-        items.append({
-            "movieId": int(row["movieId"]),
-            "title": row["title"],
-            "genres": row["genres"],
-            "year": int(row["year"]) if pd.notna(row.get("year")) else None,
-            "avg_rating": float(row["avg_rating"]),
-            "rating_count": int(row["rating_count"]),
-        })
-
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "items": items,
-    }
+    """GET /items - Returns a paginated list of movies."""
+    svc = _get_service()
+    return svc.get_items(limit=limit, offset=offset)
 
 
 @app.get("/items/{item_id}")
 def get_item(item_id: int):
-    """
-    GET /items/{item_id} - Returns details for a single movie.
-
-    Path parameter:
-    - item_id: the movieId to look up
-
-    Returns 404 if the movie is not found.
-    """
-    if movies_df.empty:
-        raise HTTPException(status_code=503, detail="Data not loaded. Run the data pipeline first.")
-
-    # Find the movie by movieId
-    match = movies_df[movies_df["movieId"] == item_id]
-
-    if match.empty:
+    """GET /items/{item_id} - Returns details for a single movie."""
+    svc = _get_service()
+    item = svc.get_item_by_id(item_id)
+    if item is None:
         raise HTTPException(status_code=404, detail=f"Item with id {item_id} not found.")
+    return item
 
-    row = match.iloc[0]
+
+@app.get("/recommendations/popular")
+def get_popular_recommendations(
+    limit: int = Query(default=10, ge=1, le=50, description="Number of popular items"),
+    min_ratings: int = Query(default=50, ge=1, description="Minimum rating count threshold"),
+):
+    """
+    GET /recommendations/popular - Returns popular movies ranked by weighted rating.
+    """
+    svc = _get_service()
+    items = svc.get_popular_items(limit=limit, min_ratings=min_ratings)
     return {
-        "movieId": int(row["movieId"]),
-        "title": row["title"],
-        "clean_title": row.get("clean_title", row["title"]),
-        "genres": row["genres"],
-        "year": int(row["year"]) if pd.notna(row.get("year")) else None,
-        "avg_rating": float(row["avg_rating"]),
-        "rating_count": int(row["rating_count"]),
+        "limit": limit,
+        "min_ratings": min_ratings,
+        "count": len(items),
+        "items": items,
     }
+
+
+@app.post("/ratings", status_code=status.HTTP_201_CREATED)
+def create_rating(payload: RatingCreate):
+    """
+    POST /ratings - Saves a 1-5 user rating for a movie (in memory + temp CSV).
+    """
+    svc = _get_service()
+    try:
+        return svc.add_rating(
+            user_id=payload.user_id,
+            movie_id=payload.movie_id,
+            rating=payload.rating,
+        )
+    except KeyError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Movie with id {payload.movie_id} not found.",
+        )
