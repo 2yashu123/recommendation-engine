@@ -7,3 +7,4 @@ venv/
 .next/
 *.log
 *.pdf
+data/raw/
