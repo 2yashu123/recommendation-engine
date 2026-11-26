@@ -13,6 +13,7 @@ interface Movie {
   avg_rating: number;
   rating_count: number;
   weighted_score?: number;
+  similarity_score?: number;
 }
 
 interface ItemsResponse {
@@ -25,6 +26,13 @@ interface ItemsResponse {
 interface PopularResponse {
   limit: number;
   min_ratings: number;
+  count: number;
+  items: Movie[];
+}
+
+interface SimilarResponse {
+  source_item: Movie;
+  k: number;
   count: number;
   items: Movie[];
 }
@@ -48,15 +56,19 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Movie Card with Interactive 1-5 Star Rating Action
+// Movie Card with Rating Action & "Find Similar" Button
 // ---------------------------------------------------------------------------
 function MovieCard({
   movie,
   highlightBadge,
+  isSelected,
+  onSelectSimilar,
   onRated,
 }: {
   movie: Movie;
   highlightBadge?: string;
+  isSelected?: boolean;
+  onSelectSimilar?: (movie: Movie) => void;
   onRated?: (movieId: number, avgRating: number, ratingCount: number) => void;
 }) {
   const [userRating, setUserRating] = useState<number | null>(null);
@@ -101,7 +113,13 @@ function MovieCard({
   }
 
   return (
-    <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-zinc-900 flex flex-col justify-between">
+    <div
+      className={`border rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-zinc-900 flex flex-col justify-between ${
+        isSelected
+          ? "border-blue-500 ring-2 ring-blue-300 dark:ring-blue-800"
+          : "border-zinc-200 dark:border-zinc-700"
+      }`}
+    >
       <div>
         <div className="flex items-start justify-between gap-2 mb-1">
           <h3 className="font-semibold text-base text-zinc-900 dark:text-zinc-100">
@@ -156,6 +174,17 @@ function MovieCard({
             ))}
           </div>
         </div>
+
+        {onSelectSimilar && (
+          <button
+            type="button"
+            onClick={() => onSelectSimilar(movie)}
+            className="mt-2.5 w-full py-1.5 px-3 text-xs font-medium rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900 transition-colors"
+          >
+            ✨ Find Similar Movies
+          </button>
+        )}
+
         {userRating !== null && (
           <p className="text-[11px] text-green-600 dark:text-green-400 mt-1 text-right">
             Saved your rating: {userRating}/5
@@ -177,6 +206,11 @@ export default function Home() {
   const [popularLoading, setPopularLoading] = useState(true);
   const [popularError, setPopularError] = useState<string | null>(null);
 
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [similarMovies, setSimilarMovies] = useState<Movie[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState<string | null>(null);
+
   const [movies, setMovies] = useState<Movie[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -184,7 +218,7 @@ export default function Home() {
   const [offset, setOffset] = useState(0);
   const limit = 18;
 
-  // Fetch Popular Right Now section
+  // Fetch Popular Right Now
   useEffect(() => {
     setPopularLoading(true);
     setPopularError(null);
@@ -203,7 +237,7 @@ export default function Home() {
       });
   }, []);
 
-  // Fetch paginated Catalog section
+  // Fetch Catalog
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -223,22 +257,43 @@ export default function Home() {
       });
   }, [offset]);
 
-  // Update local card state when a user submits a rating
+  // Fetch Similar Items when a movie is selected
+  async function handleSelectSimilar(movie: Movie) {
+    setSelectedMovie(movie);
+    setSimilarLoading(true);
+    setSimilarError(null);
+    try {
+      const res = await fetch(
+        `${API_BASE}/recommendations/similar/${movie.movieId}?k=6`
+      );
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Error ${res.status}`);
+      }
+      const data: SimilarResponse = await res.json();
+      setSimilarMovies(data.items);
+      // Scroll smoothly to the Similar Items section
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to load similar movies";
+      setSimilarError(msg);
+      setSimilarMovies([]);
+    } finally {
+      setSimilarLoading(false);
+    }
+  }
+
   function handleMovieRated(movieId: number, avgRating: number, ratingCount: number) {
-    setMovies((prev) =>
-      prev.map((m) =>
+    const updater = (list: Movie[]) =>
+      list.map((m) =>
         m.movieId === movieId
           ? { ...m, avg_rating: avgRating, rating_count: ratingCount }
           : m
-      )
-    );
-    setPopular((prev) =>
-      prev.map((m) =>
-        m.movieId === movieId
-          ? { ...m, avg_rating: avgRating, rating_count: ratingCount }
-          : m
-      )
-    );
+      );
+    setMovies(updater);
+    setPopular(updater);
+    setSimilarMovies(updater);
   }
 
   const currentPage = Math.floor(offset / limit) + 1;
@@ -252,10 +307,62 @@ export default function Home() {
             🎬 AI Recommendation Engine
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 mt-2">
-            Discover top-rated films and rate movies from our catalog of{" "}
-            {total.toLocaleString()} titles.
+            Discover top-rated films, click &quot;Find Similar Movies&quot; for content-based recommendations, and rate titles from our catalog of{" "}
+            {total.toLocaleString()} movies.
           </p>
         </header>
+
+        {/* Similar Items Panel (shown when a movie is clicked) */}
+        {selectedMovie && (
+          <section className="mb-10 p-5 rounded-xl border-2 border-indigo-300 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-indigo-950 dark:text-indigo-200">
+                  ✨ Similar to &quot;{selectedMovie.title}&quot;
+                </h2>
+                <p className="text-xs text-indigo-700 dark:text-indigo-400 mt-0.5">
+                  Content-based recommendations via TF-IDF + Cosine Similarity ({selectedMovie.genres})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMovie(null);
+                  setSimilarMovies([]);
+                }}
+                className="px-3 py-1 text-xs rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {similarLoading && (
+              <p className="text-sm text-indigo-600 py-4">
+                Computing TF-IDF similarity...
+              </p>
+            )}
+            {similarError && (
+              <p className="text-sm text-red-500 py-2">Error: {similarError}</p>
+            )}
+            {!similarLoading && !similarError && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {similarMovies.map((movie) => (
+                  <MovieCard
+                    key={`sim-${movie.movieId}`}
+                    movie={movie}
+                    highlightBadge={
+                      movie.similarity_score !== undefined
+                        ? `${Math.round(movie.similarity_score * 100)}% match`
+                        : undefined
+                    }
+                    onSelectSimilar={handleSelectSimilar}
+                    onRated={handleMovieRated}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Popular Right Now Section */}
         <section className="mb-10">
@@ -283,6 +390,8 @@ export default function Home() {
                   key={`pop-${movie.movieId}`}
                   movie={movie}
                   highlightBadge={`#${idx + 1} Popular`}
+                  isSelected={selectedMovie?.movieId === movie.movieId}
+                  onSelectSimilar={handleSelectSimilar}
                   onRated={handleMovieRated}
                 />
               ))}
@@ -331,6 +440,8 @@ export default function Home() {
                   <MovieCard
                     key={movie.movieId}
                     movie={movie}
+                    isSelected={selectedMovie?.movieId === movie.movieId}
+                    onSelectSimilar={handleSelectSimilar}
                     onRated={handleMovieRated}
                   />
                 ))}
