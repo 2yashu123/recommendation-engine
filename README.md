@@ -104,6 +104,18 @@ Detailed architectural specifications and flow descriptions are available in [`d
 
 ---
 
+## Requirements & Planning
+
+Detailed functional, non-functional, and user requirements along with MoSCoW prioritization and a per-module task breakdown are documented in [`docs/requirements.md`](docs/requirements.md).
+
+**Key targets:**
+- API response time under 1 second for all endpoints
+- No secrets or credentials committed to version control
+- Database-agnostic design (SQLite for dev, PostgreSQL for production) via SQLAlchemy
+- Clean, commented code a beginner can understand and explain
+
+---
+
 ## Getting Started
 
 ### 1. Environment Configuration
