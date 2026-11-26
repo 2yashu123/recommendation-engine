@@ -7,4 +7,7 @@ venv/
 .next/
 *.log
 *.pdf
+*.db
+*.sqlite
+*.sqlite3
 data/raw/
