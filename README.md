@@ -3,6 +3,17 @@
 
 An end-to-end AI-powered Recommendation Engine designed to deliver personalized content and product recommendations in real time. The platform integrates a modern Next.js frontend with a high-performance Python FastAPI backend, leveraging PostgreSQL with pgvector for efficient vector similarity searches, Redis for low-latency caching, and machine learning pipelines built using pandas and scikit-learn.
 
+## Current Status (Phase 1 — Day 7)
+
+- **Environment:** Python 3.12 (`backend/venv`), Node.js v20.18.0 (`frontend/`), Git 2.55.0 configured. Docker Engine is pending BIOS virtualization, so local development uses SQLite via SQLAlchemy.
+- **Working Features:**
+  - MovieLens `ml-latest-small` cleaned (`9,742` movies, `100,836` ratings) via `backend/app/services/data_loader.py`
+  - FastAPI endpoints: `GET /`, `GET /items`, `GET /items/{item_id}`, `GET /recommendations/popular`, `POST /ratings`
+  - Next.js UI at `http://localhost:3000` with **Popular Right Now**, paginated **Movie Catalog**, and **1–5 Star Rating** buttons
+- **Progress & Demo Docs:** See [`docs/progress-review.md`](docs/progress-review.md) and [`docs/demo-script.md`](docs/demo-script.md).
+
+---
+
 ## Project Overview
 
 The AI Recommendation Engine addresses the cold-start and real-time retrieval challenges in modern web platforms. By combining dense vector similarity searches (semantic embeddings via pgvector) with collaborative/content-based filtering and high-speed in-memory caching via Redis, the engine delivers hyper-personalized recommendations at scale with sub-50ms latency.
