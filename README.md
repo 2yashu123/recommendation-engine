@@ -129,6 +129,22 @@ Detailed functional, non-functional, and user requirements along with MoSCoW pri
 
 ## Getting Started
 
+### 0. API Documentation & Quick Reference
+Full endpoint specifications (request/response schemas and status codes) are in [`docs/api.md`](docs/api.md), and live test outputs are in [`docs/api-testing.md`](docs/api-testing.md).
+Main endpoints:
+- `GET /health` — API & database connectivity status
+- `GET /items` & `GET /items/{item_id}` — Paginated catalog & item detail
+- `GET /recommendations/popular` — Weighted-rating popular fallback
+- `GET /recommendations/similar/{item_id}?k=10` — TF-IDF content similarity
+- `POST /ratings`, `GET /ratings`, `PUT /ratings/{rating_id}`, `DELETE /ratings/{rating_id}` — Ratings CRUD
+- `POST /interactions` — User interaction logging (`view`, `click`, `similar_click`)
+
+To run automated backend tests:
+```powershell
+cd backend
+.\venv\Scripts\pytest.exe
+```
+
 ### 1. Environment Configuration
 Copy the template environment file and set your credentials:
 ```bash

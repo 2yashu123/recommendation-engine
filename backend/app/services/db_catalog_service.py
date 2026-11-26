@@ -4,9 +4,50 @@ db_catalog_service.py - Database-backed CRUD & recommendation helpers using SQLA
 
 from datetime import datetime, timezone
 import pandas as pd
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 from app.models.db_models import User, Item, Rating, Interaction
+
+
+def check_db_health(db: Session) -> bool:
+    """Verify database connectivity with a lightweight SELECT 1 query."""
+    db.execute(text("SELECT 1"))
+    return True
+
+
+def create_interaction_in_db(
+    db: Session, user_id: int, movie_id: int, interaction_type: str
+) -> dict:
+    """Record a user interaction (view, click, similar_click) in the interactions table."""
+    item = db.query(Item).filter(Item.id == movie_id).first()
+    if not item:
+        raise KeyError(f"Movie with id {movie_id} not found.")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        user = User(id=user_id, username=f"user_{user_id}")
+        db.add(user)
+        db.commit()
+
+    interaction = Interaction(
+        user_id=user_id,
+        item_id=movie_id,
+        interaction_type=interaction_type,
+    )
+    db.add(interaction)
+    db.commit()
+    db.refresh(interaction)
+
+    return {
+        "message": "Interaction logged",
+        "interaction": {
+            "id": interaction.id,
+            "user_id": interaction.user_id,
+            "movie_id": interaction.item_id,
+            "interaction_type": interaction.interaction_type,
+            "created_at": interaction.created_at.isoformat() if interaction.created_at else None,
+        },
+    }
 
 
 def item_to_dict(item: Item) -> dict:
